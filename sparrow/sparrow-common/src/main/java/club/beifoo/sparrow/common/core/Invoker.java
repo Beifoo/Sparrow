@@ -2,14 +2,21 @@ package club.beifoo.sparrow.common.core;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-public class Invoker extends AbstractExecutorService  {
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
+
+public class Invoker {
 	//TODO Self4j+Logback日志
 	//
 	private static final int DEFAULT_REQUEST_QUEUE_SIZE = 20480;
@@ -20,13 +27,12 @@ public class Invoker extends AbstractExecutorService  {
 	public static final Object EMPTY_ARGS[] = new Object[] {};
 	public static final InvokeAspect EMPTY_CALLBACK = new DefaultInvokeAspect() {};
 	//
-	private String invokeThreadNamePrefix;
-	private String invokeThreadGroupName;
-	private ThreadPoolExecutor poolExecutor;
 	private LinkedBlockingQueue<Runnable> requestQueue;
+	private ThreadPoolExecutor poolExecutor;
+	private ListeningExecutorService callbackPoolExecutor;
 	private List<InvokeAspect> globalAspects;
 
-	public Invoker() {
+	public Invoker(String invokeThreadGroupName, String invokeThreadNamePrefix) {
 		requestQueue = new LinkedBlockingQueue<Runnable>(DEFAULT_REQUEST_QUEUE_SIZE);
 		poolExecutor = new ThreadPoolExecutor(
 				DEFAULT_CORE_POOL_SIZE, 
@@ -35,6 +41,7 @@ public class Invoker extends AbstractExecutorService  {
 				TimeUnit.SECONDS, 
 				requestQueue, new InvokeThreadFactory(invokeThreadGroupName, invokeThreadNamePrefix, false));
 		poolExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+		callbackPoolExecutor = MoreExecutors.listeningDecorator(poolExecutor);
 		globalAspects = new ArrayList<InvokeAspect>();
 	}
 	
@@ -46,39 +53,21 @@ public class Invoker extends AbstractExecutorService  {
 		return new ArrayList<InvokeAspect>(globalAspects);
 	}
 	
-	@Override
-	public void execute(Runnable runnable) {
-		poolExecutor.execute(runnable);
+	public void execute(Runnable command) {
+		callbackPoolExecutor.execute(command);
 	}
 	
-	@Override
-	public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
-		// TODO Auto-generated method stub
-		return false;
+	public <T> Future<T> submit(Callable<T> task) {
+		return callbackPoolExecutor.submit(task);
 	}
-
-	@Override
-	public boolean isShutdown() {
-		// TODO Auto-generated method stub
-		return false;
+	
+	public Future<?> submit(Runnable task) {
+		return callbackPoolExecutor.submit(task);
 	}
-
-	@Override
-	public boolean isTerminated() {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	@Override
-	public void shutdown() {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public List<Runnable> shutdownNow() {
-		// TODO Auto-generated method stub
-		return null;
+	
+	public <T> void submitWithCallback(Callable<T> task, FutureCallback<T> callback) {
+		ListenableFuture<T> future = callbackPoolExecutor.submit(task);
+		Futures.addCallback(future, callback, callbackPoolExecutor);
 	}
 	
 	//--------------------------------------------------
