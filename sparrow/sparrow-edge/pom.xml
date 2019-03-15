@@ -10,33 +10,26 @@
 		<version>0.1.0-SNAPSHOT</version>
 	</parent>
 
-	<artifactId>sparrow-common</artifactId>
-	<name>sparrow-common</name>
+	<artifactId>sparrow-edge</artifactId>
+	<name>sparrow-edge</name>
 	<url>http://maven.apache.org</url>
-
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<sparrow-common.version>0.1.0-SNAPSHOT</sparrow-common.version>
 	</properties>
 	<dependencies>
 		<dependency>
-			<groupId>com.google.guava</groupId>
-			<artifactId>guava</artifactId>
+			<groupId>club.beifoo.sparrow</groupId>
+			<artifactId>sparrow-common</artifactId>
+			<version>${sparrow-common.version}</version>
 		</dependency>
 		<dependency>
-				<groupId>com.alibaba</groupId>
-				<artifactId>fastjson</artifactId>
-			</dependency>
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
+			<groupId>io.netty</groupId>
+			<artifactId>netty-all</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>ch.qos.logback</groupId>
-			<artifactId>logback-classic</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>ch.qos.logback</groupId>
-			<artifactId>logback-core</artifactId>
+			<groupId>com.ning</groupId>
+			<artifactId>async-http-client</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>junit</groupId>

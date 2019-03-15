@@ -1,14 +1,20 @@
 package club.beifoo.sparrow.common.core;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -16,8 +22,11 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 
-public class Invoker {
-	//TODO Self4j+Logback日志
+public class Invoker implements Executor {
+	//TODO 注解还没加上去
+	//TODO Logger全部变成static
+	private static final Logger logger = LoggerFactory.getLogger(Invoker.class);  
+
 	//
 	private static final int DEFAULT_REQUEST_QUEUE_SIZE = 20480;
 	private static final int DEFAULT_CORE_POOL_SIZE = 32;
@@ -43,6 +52,28 @@ public class Invoker {
 		poolExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
 		callbackPoolExecutor = MoreExecutors.listeningDecorator(poolExecutor);
 		globalAspects = new ArrayList<InvokeAspect>();
+		//TODO Log Debug
+	}
+	
+	public Invoker(String invokeThreadGroupName, String invokeThreadNamePrefix, int coreSize) {
+		requestQueue = new LinkedBlockingQueue<Runnable>(DEFAULT_REQUEST_QUEUE_SIZE);
+		poolExecutor = new ThreadPoolExecutor(
+				coreSize, 
+				coreSize*2,
+				DEFAULT_KEEPALIVE_TIME,
+				TimeUnit.SECONDS, 
+				requestQueue, new InvokeThreadFactory(invokeThreadGroupName, invokeThreadNamePrefix, false));
+		poolExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+		callbackPoolExecutor = MoreExecutors.listeningDecorator(poolExecutor);
+		globalAspects = new ArrayList<InvokeAspect>();
+	}
+	
+	public static Method getMethod(Class<?>clazz,String name,Class<?>...pTypes){
+		try {
+			return clazz.getDeclaredMethod(name, pTypes);
+		} catch (Exception e) {
+			return null;
+		} 
 	}
 	
 	public void addGlobalAspects(InvokeAspect aspect){
@@ -50,7 +81,7 @@ public class Invoker {
 	}
 	
 	public List<InvokeAspect> getGlobalAspects(){
-		return new ArrayList<InvokeAspect>(globalAspects);
+		return this.globalAspects;
 	}
 	
 	public void execute(Runnable command) {
@@ -70,11 +101,32 @@ public class Invoker {
 		Futures.addCallback(future, callback, callbackPoolExecutor);
 	}
 	
+	public void invokeInPool(String traceId, Object instance, Method method, 
+			InvokeAspect aspect, Object ...args) {
+		//总数增加
+		try {
+			this.execute(new ThreadWorker(
+					this,
+					traceId,
+					instance, method, args, aspect));
+		} catch(RejectedExecutionException e){
+			//任务拒绝数增加
+			logger.error("task rejected {}-{}.{}, queueSize:{}",
+					traceId,
+					instance.getClass().getSimpleName(),
+					method.getName(),
+					getQueue().size());
+		} catch (Throwable e) {
+			logger.error("unknown exception: {}", e);
+		}
+	} 
+	
+	//TODO 生命周期管理部分还需完善
+	public void shutdown() {
+		callbackPoolExecutor.shutdown();
+	}
+	
 	//--------------------------------------------------
-	/**
-	 * @return
-	 * @see java.util.concurrent.ThreadPoolExecutor#getActiveCount()
-	 */
 	public int getActiveCount() {
 		return poolExecutor.getActiveCount();
 	}

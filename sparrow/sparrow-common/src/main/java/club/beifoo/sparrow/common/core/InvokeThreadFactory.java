@@ -3,8 +3,12 @@ package club.beifoo.sparrow.common.core;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class InvokeThreadFactory implements ThreadFactory {
-	//TODO Logger
+	private final Logger logger = LoggerFactory.getLogger(InvokeThreadFactory.class);  
+	
 	private final AtomicInteger threadCounter;
 	private final boolean daemonThread;
 	private final ThreadGroup threadGroup;
@@ -26,8 +30,7 @@ public class InvokeThreadFactory implements ThreadFactory {
 		Thread.UncaughtExceptionHandler logHander=new Thread.UncaughtExceptionHandler() {
 			@Override
 			public void uncaughtException(Thread t, Throwable e) {
-				//TODO 日志输出
-				//logger.error(e.getMessage(),e);
+				logger.error(e.getMessage(), e);
 			}
 		};
 		t.setUncaughtExceptionHandler(logHander);
